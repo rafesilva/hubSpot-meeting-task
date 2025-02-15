@@ -6,7 +6,7 @@ const { filterNullValuesFromObject, goal } = require('./utils');
 const Domain = require('./Domain');
 
 const hubspotClient = new hubspot.Client({ accessToken: '' });
-const propertyPrefix = 'hubspot__';
+// const propertyPrefix = 'hubspot__';
 let expirationDate = new Date(0);
 
 const generateLastModifiedDateFilter = (date, nowDate, propertyName = 'hs_lastmodifieddate') => {
@@ -59,7 +59,7 @@ const processCompanies = async (domain, hubId, q) => {
   const account = domain.integrations.hubspot.accounts.find(account => account.hubId === hubId);
   const lastPulledDate = new Date(account.lastPulledDates.companies);
   const now = new Date();
-  console.log('COMPANIES', lastPulledDate)
+  // console.log('COMPANIES', lastPulledDate)
   let hasMore = true;
   const offsetObject = {};
   const limit = 100;
@@ -67,7 +67,6 @@ const processCompanies = async (domain, hubId, q) => {
   while (hasMore) {
     const lastModifiedDate = offsetObject.lastModifiedDate || lastPulledDate;
     const lastModifiedDateFilter = generateLastModifiedDateFilter(lastModifiedDate, now);
-    console.log('lastModifiedDateFilter', lastModifiedDateFilter)
     const searchObject = {
       filterGroups: [lastModifiedDateFilter],
       sorts: [{ propertyName: 'hs_lastmodifieddate', direction: 'ASCENDING' }],
@@ -100,14 +99,13 @@ const processCompanies = async (domain, hubId, q) => {
         await new Promise((resolve, reject) => setTimeout(resolve, 500 * Math.pow(2, tryCount)));
       }
     }
-    console.log('searchResult', searchResult)
 
     if (!searchResult) throw new Error('Failed to fetch companies for the 4th time. Aborting.');
 
     const data = searchResult?.results || [];
     offsetObject.after = parseInt(searchResult?.paging?.next?.after);
 
-    console.log('fetch company batch', data);
+    console.log('fetch company batch');
 
     data.forEach(company => {
       if (!company.properties) return;
@@ -149,7 +147,7 @@ const processCompanies = async (domain, hubId, q) => {
 const processContacts = async (domain, hubId, q) => {
   const account = domain.integrations.hubspot.accounts.find(account => account.hubId === hubId);
   const lastPulledDate = new Date(account.lastPulledDates.contacts);
-  console.log('CONTACTS ', lastPulledDate)
+  // console.log('CONTACTS ', lastPulledDate)
   const now = new Date();
   
   let hasMore = true;
@@ -157,7 +155,6 @@ const processContacts = async (domain, hubId, q) => {
   const limit = 100;
   
   while (hasMore) {
-    console.log('contacts')
     const lastModifiedDate = offsetObject.lastModifiedDate || lastPulledDate;
     const lastModifiedDateFilter = generateLastModifiedDateFilter(lastModifiedDate, now, 'lastmodifieddate');
     const searchObject =  {
@@ -219,7 +216,6 @@ const processContacts = async (domain, hubId, q) => {
         return [a.from.id, a.to[0].id];
       } else return false;
     }).filter(x => x));
-    // console.log('data',data)
     data.forEach(contact => {
       if (!contact.properties || !contact.properties.email) return;
 
@@ -282,11 +278,11 @@ const processMeetings = async (domain, hubId, q) => {
   while (hasMore) {
     const lastModifiedDate = offsetObject.lastModifiedDate || lastPulledDate
     const lastModifiedDateFilter = generateLastModifiedDateFilter(lastModifiedDate, now, 'hs_lastmodifieddate')
-
+    console.log('lastModifiedDateFilter', lastModifiedDateFilter)
     const searchObject = {
       groups:[lastModifiedDateFilter],
       sorts: [{ propertyName: 'hs_lastmodifieddate', direction: 'ASCENDING' }],
-      properties: ['hs_meeting_title', 'hs_meeting_start_time', 'hs_meeting_end_time', 'createdAt', 'updatedAt'],
+      properties: ['hs_meeting_title', 'hs_meeting_start_time', 'hs_meeting_end_time', 'hs_lastmodifieddate', 'createdAt', 'updatedAt'],
       limit,
       after: offsetObject.after
     }
@@ -306,14 +302,14 @@ const processMeetings = async (domain, hubId, q) => {
     }
     
     if (!searchResult) throw new Error('Failed to fetch meetings for the 4th time. Aborting.')
-    console.log('meetings searchResult', searchResult)
+    // console.log('meetings searchResult', searchResult)
   
     const data = searchResult.results || []
     
     console.log('fetch meeting batch')
     
-    offsetObject.after = parseInt(searchResult.paging?.next?.after)
-    
+    offsetObject.after = parseInt(searchResult.paging?.next?.after) || 0
+    // console.log('meetings offsetObject', offsetObject)
     const meetingIds = data.map(m => m.id)
     
     const contactAssociationsResponse =
@@ -347,7 +343,7 @@ const processMeetings = async (domain, hubId, q) => {
         }
       })
       // console.log('contactsBatchResponse', contactsBatchResponse)
-      const contactsJson = await (await contactsBatchResponse.json())
+      const contactsJson = (await contactsBatchResponse.json())
       contactsJson?.results.forEach(contact => {
         contactData[contact.id] = contact.properties?.email || null
       })
@@ -356,16 +352,16 @@ const processMeetings = async (domain, hubId, q) => {
     data.forEach(meeting => {
       // console.log('meeting', meeting)
       const isCreated = new Date(meeting.createdAt) > lastPulledDate
-      // console.log('isCreated', isCreated, new Date(meeting.createdAt),  lastPulledDate)
+      // console.log('meeting isCreated? ', isCreated, new Date(meeting.createdAt),  lastPulledDate)
       let contactEmail = null
       const associatedContacts = meetingToContacts[meeting.id] || []
       if (associatedContacts.length > 0) {
-        contactEmail = contactData[associatedContacts[0]] || null
+        contactEmail = contactData[associatedContacts[0]] || 'Unknown'
       }
       
       const meetingProperties = {
         meeting_id: meeting.id,
-        meeting_title: meeting.properties.hes_meeting_title || null,
+        meeting_title: meeting.properties.hs_meeting_title || null,
         meeting_start_time: meeting.properties.hs_meeting_start_time || null,
         meeting_end_time: meeting.properties.hs_meeting_end_time || null
       }
@@ -374,7 +370,7 @@ const processMeetings = async (domain, hubId, q) => {
         actionName: isCreated ? 'Meeting Created' : 'Meeting Updated',
         actionDate: new Date(isCreated ? meeting.createdAt : meeting.updatedAt),
         includeInAnalytics: 0,
-        identity: contactEmail || '',
+        identity: contactEmail,
         meetingProperties: filterNullValuesFromObject(meetingProperties)
       })
     })
@@ -436,19 +432,19 @@ const pullDataFromHubspot = async () => {
     const actions = [];
     const q = createQueue(domain, actions);
 
-    // try {
-    //   await processContacts(domain, account.hubId, q);
-    //   console.log('process contacts');
-    // } catch (err) {
-    //   console.log(err, { apiKey: domain.apiKey, metadata: { operation: 'processContacts', hubId: account.hubId } });
-    // }
-    //
-    // try {
-    //   await processCompanies(domain, account.hubId, q);
-    //   console.log('process companies');
-    // } catch (err) {
-    //   console.log(err, { apiKey: domain.apiKey, metadata: { operation: 'processCompanies', hubId: account.hubId } });
-    // }
+    try {
+      await processContacts(domain, account.hubId, q);
+      console.log('process contacts');
+    } catch (err) {
+      console.log(err, { apiKey: domain.apiKey, metadata: { operation: 'processContacts', hubId: account.hubId } });
+    }
+
+    try {
+      await processCompanies(domain, account.hubId, q);
+      console.log('process companies');
+    } catch (err) {
+      console.log(err, { apiKey: domain.apiKey, metadata: { operation: 'processCompanies', hubId: account.hubId } });
+    }
   
     try {
       await processMeetings(domain, account.hubId, q);
