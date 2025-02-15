@@ -1,25 +1,32 @@
-# API Sample Test
+# Debrief
 
-## Getting Started
+#### Code Quality and Readability:
+I would set up linting and formatting tools (like ESLint and Prettier) to keep our code style consistent 
+and catch problems early. Breaking up those giant functions into smaller following the single responsibility principle.
+If more focused helpers would also make the code a lot easier to read and maintain, especially when dealing with pagination and association lookups.
 
-This project requires a newer version of Node. Don't forget to install the NPM packages afterwards.
+#### Project Architecture:
+Since it has several similar functions (like processContacts, processCompanies, and processMeetings), 
+it makes sense for example to extract the retry logic into reusable utilities.
+This would cut down on duplicate code and keep things more centralized, making it more DRY as possible.
+I’d also add a more robust error handling system, maybe with a standard function or middleware to manage retries, 
+token refreshing, and logging errors.
 
-You should change the name of the ```.env.example``` file to ```.env```.
+#### Code Performance:
+Right now, it is fetching objects in batches of 100 and processing associations one by one. 
+It can be speed up by optimizing concurrency or reducing round trips with better batch queries. 
+Also. caching common data or using bulk endpoints consistently would also help educe the number of API calls. 
+It could consider scheduling the worker more smartly and storing less state so fewer updates need to be processed each time.
 
-Run ```node app.js``` to get things started. Hopefully the project should start without any errors.
+#### Potential Bugs & Issues:
+Meetings lastPulledDates not defined at Domain.js.
+If the "account.lastPulledDates.meetings" is not set up properly, it might run into undefined or NaN errors when 
+comparing dates, so it is important to initialize it. There’s also a chance that retries could keep failing 
+if HubSpot stays down, so a longer-term backoff strategy might be necessary. The part of the code 
+that checks for expirationDate might break if it is not updated correctly or if the environment variables are 
+missing, so it might need better fallback logic or dynamic re-auth attempts.
 
-## Explanations
+#### Screenshot of the Console Output:
 
-The actual task will be explained separately.
+![image](https://github.com/rafesilva/hubSpot-meeting-task/blob/main/Screenshot%202025-02-15%20at%2012.20.37.png?raw=true)
 
-This is a very simple project that pulls data from HubSpot's CRM API. It pulls and processes company and contact data from HubSpot but does not insert it into the database.
-
-In HubSpot, contacts can be part of companies. HubSpot calls this relationship an association. That is, a contact has an association with a company. We make a separate call when processing contacts to fetch this association data.
-
-The Domain model is a record signifying a HockeyStack customer. You shouldn't worry about the actual implementation of it. The only important property is the ```hubspot```object in ```integrations```. This is how we know which HubSpot instance to connect to.
-
-The implementation of the server and the ```server.js``` is not important for this project.
-
-Every data source in this project was created for test purposes. If any request takes more than 5 seconds to execute, there is something wrong with the implementation.
-
-# hubSpot-meeting-task
