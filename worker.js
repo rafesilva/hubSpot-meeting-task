@@ -278,7 +278,7 @@ const processMeetings = async (domain, hubId, q) => {
   while (hasMore) {
     const lastModifiedDate = offsetObject.lastModifiedDate || lastPulledDate
     const lastModifiedDateFilter = generateLastModifiedDateFilter(lastModifiedDate, now, 'hs_lastmodifieddate')
-    console.log('lastModifiedDateFilter', lastModifiedDateFilter)
+    // console.log('lastModifiedDateFilter', lastModifiedDateFilter)
     const searchObject = {
       groups:[lastModifiedDateFilter],
       sorts: [{ propertyName: 'hs_lastmodifieddate', direction: 'ASCENDING' }],
